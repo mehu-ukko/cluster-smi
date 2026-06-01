@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/apcera/termtables"
+	"github.com/scylladb/termtables"
 	"os/user"
 	"regexp"
 	"sort"

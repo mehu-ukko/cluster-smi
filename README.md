@@ -1,5 +1,5 @@
 # CLUSTER-SMI
-[![Build Status](http://ci.patwie.com/api/badges/PatWie/cluster-smi/status.svg)](http://ci.patwie.com/PatWie/cluster-smi)
+[![build](https://github.com/patwie/cluster-smi/actions/workflows/build.yml/badge.svg)](https://github.com/patwie/cluster-smi/actions/workflows/build.yml)
 
 The same as `nvidia-smi` but for multiple machines.
 
@@ -57,67 +57,38 @@ You might be interested as well in [cluster-top](https://github.com/PatWie/clust
 
 ## Installation
 
-All steps below are used to test possible changes to this codebase. See the [dockerfile](https://github.com/PatWie/cluster-smi/blob/master/.drone/Dockerfile) and [specific steps](https://github.com/PatWie/cluster-smi/blob/master/.drone.yml) to compile this project in the provided files used by CI.
+### Pre-built binaries
 
-### Requirements + Dependencies
+Download the latest release from the [releases page](https://github.com/patwie/cluster-smi/releases). Two archives are published per release:
 
-- CUDA (just for `cluster-smi-node.go`)
-- ZMQ (4.0.1)
+- `cluster-smi-<tag>-linux-amd64.tar.gz` — `cluster-smi` and `cluster-smi-router` (no CUDA needed)
+- `cluster-smi-<tag>-cuda-linux-amd64.tar.gz` — also includes `cluster-smi-node` and `cluster-smi-local` (require an NVIDIA driver at runtime)
 
-Unfortunately, *ZMQ* can only be dynamically linked (`libzmq.so`) to this repository and you need to build it separately by
+ZeroMQ is now a pure-Go dependency, so the binaries have no external `libzmq` requirement.
+
+### Building from source
+
+Requirements:
+
+- Go 1.21+
+- For `cluster-smi-node` / `cluster-smi-local` only: CUDA toolkit (provides `libnvidia-ml`)
 
 ```bash
-# compile ZMQ library for c++
-cd /path/to/your_lib_folder
-wget http:/files.patwie.com/mirror/zeromq-4.1.0-rc1.tar.gz
-tar -xf zeromq-4.1.0-rc1.tar.gz
-cd zeromq-4.1.0
-./autogen.sh
-./configure
-./configure --prefix=/path/to/your_lib_folder/zeromq-4.1.0/dist
-make
-make install
+cp config.example.go config.go
+make all
 ```
 
-Finally:
-
-```
-export PKG_CONFIG_PATH=/path/to/your_lib_folder/zeromq-4.1.0/dist/lib/pkgconfig/:$PKG_CONFIG_PATH
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/your_lib_folder/zeromq-4.1.0/dist/lib
-```
-
-Edit the CFLAGS, LDFLAGS in file `nvvml/nvml.go` to match your setup.
-
-### Compiling
-
-You need to copy one config-file
-
-```console
-user@host $ cp config.example.go config.go
-```
-
-To obtain a portable small binary, I suggest to directly embed the configuration settings (ports, ip-addr) into the binary as compile-time constants. This way, the app is fully self-contained (excl. libzmq.so) and does not require any configuration-files. This can be done by editing `config.go`:
+To embed configuration into the binary, edit `config.go` (compile-time defaults for ports and router IP):
 
 ```go
-...
 c.RouterIp = "127.0.0.1"
 c.Tick = 3
 c.Timeout = 180
 c.Ports.Nodes = "9080"
 c.Ports.Clients = "9081"
-...
 ```
 
-Otherwise, you can specify the environment variable `CLUSTER_SMI_CONFIG_PATH` pointing to a yaml file (example in `cluster-smi.example.yml`).
-
-Then run
-
-```bash
-cd proc
-go install
-cd ..
-make all
-```
+Otherwise, set `CLUSTER_SMI_CONFIG_PATH` to a YAML file (see `cluster-smi.example.yml`).
 
 
 ### Run

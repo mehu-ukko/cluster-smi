@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/go-zeromq/zmq4"
 	"github.com/patwie/cluster-smi/cluster"
-	"github.com/pebbe/zmq4"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v5"
 	"log"
 	"os"
 	"time"
@@ -16,7 +17,7 @@ type Request struct {
 	Identity string
 }
 
-func RequestUpdateMessage() (buf []byte, err error) {
+func RequestUpdateMessage() ([]byte, error) {
 	id := fmt.Sprintf("REQ %v", os.Getpid())
 	req := Request{id}
 	return msgpack.Marshal(&req)
@@ -40,31 +41,26 @@ func main() {
 	cfg := LoadConfig()
 
 	// ask for updates messages (REQ-ROUTER)
-	request_socket, err := zmq4.NewSocket(zmq4.REQ)
-	if err != nil {
-		log.Fatalf("Failed open Socket ZMQ: %s\n", err.Error())
-		panic(err)
-	}
+	request_socket := zmq4.NewReq(context.Background())
 	defer request_socket.Close()
 
 	SocketAddr := "tcp://" + cfg.RouterIp + ":" + cfg.Ports.Clients
-	request_socket.Connect(SocketAddr)
+	if err := request_socket.Dial(SocketAddr); err != nil {
+		log.Fatalf("Failed to dial %s: %s\n", SocketAddr, err.Error())
+	}
 	for {
 
 		// request new update
-		msg, err := RequestUpdateMessage()
+		buf, err := RequestUpdateMessage()
 		if err != nil {
 			log.Fatal("request messsage error:", err)
-			panic(err)
 		}
-		_, err = request_socket.SendBytes(msg, 0)
-		if err != nil {
+		if err := request_socket.Send(zmq4.NewMsg(buf)); err != nil {
 			log.Fatal("sending request messsage error:", err)
-			panic(err)
 		}
 
 		// response from cluster-smi-server
-		s, err := request_socket.RecvBytes(0)
+		msg, err := request_socket.Recv()
 		if err != nil {
 			log.Println(err)
 
@@ -78,7 +74,11 @@ func main() {
 		}
 
 		var clus cluster.Cluster
-		err = msgpack.Unmarshal(s, &clus)
+		err = msgpack.Unmarshal(msg.Bytes(), &clus)
+		if err != nil {
+			log.Println("decode error:", err)
+			continue
+		}
 
 		if *usernameFilter != "" {
 			clus = cluster.FilterByUser(clus, *usernameFilter)

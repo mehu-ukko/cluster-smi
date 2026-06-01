@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
+	"github.com/go-zeromq/zmq4"
 	"github.com/patwie/cluster-smi/cluster"
-	"github.com/patwie/cluster-smi/messaging"
-	"github.com/pebbe/zmq4"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v5"
 	"log"
 	"sync"
 )
@@ -30,26 +30,24 @@ func main() {
 	// receiving messages in extra thread
 	go func() {
 		// incoming messages (PUSH-PULL)
-		SocketAddr := "tcp://" + "*" + ":" + cfg.Ports.Nodes
+		SocketAddr := "tcp://*:" + cfg.Ports.Nodes
 		log.Println("waiting for nodes connecting to ", SocketAddr)
-		node_socket, err := zmq4.NewSocket(zmq4.PULL)
-		if err != nil {
-			panic(err)
-		}
+		node_socket := zmq4.NewPull(context.Background())
 		defer node_socket.Close()
-		node_socket.Bind(SocketAddr)
+		if err := node_socket.Listen(SocketAddr); err != nil {
+			log.Fatalf("Failed to bind %s: %s\n", SocketAddr, err.Error())
+		}
 
 		for {
 			// read node information
-			s, err := node_socket.RecvBytes(0)
+			msg, err := node_socket.Recv()
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 
 			var node cluster.Node
-			err = msgpack.Unmarshal(s, &node)
-			if err != nil {
+			if err := msgpack.Unmarshal(msg.Bytes(), &node); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -66,21 +64,21 @@ func main() {
 	}()
 
 	// outgoing messages (REQ-ROUTER)
-	SocketAddr := "tcp://" + "*" + ":" + cfg.Ports.Clients
+	SocketAddr := "tcp://*:" + cfg.Ports.Clients
 	log.Println("Waiting for clients connecting to", SocketAddr)
-	router_socket, err := zmq4.NewSocket(zmq4.ROUTER)
-	if err != nil {
-		panic(err)
-	}
+	router_socket := zmq4.NewRouter(context.Background())
 	defer router_socket.Close()
-	router_socket.Bind(SocketAddr)
+	if err := router_socket.Listen(SocketAddr); err != nil {
+		log.Fatalf("Failed to bind %s: %s\n", SocketAddr, err.Error())
+	}
 
 	for {
 
-		// read request of client
-		msg, err := messaging.ReceiveMultipartMessage(router_socket)
+		// read request: ROUTER prepends identity, REQ adds empty delimiter, then body
+		req, err := router_socket.Recv()
 		if err != nil {
-			panic(err)
+			log.Println("recv error:", err)
+			continue
 		}
 
 		mutex.Lock()
@@ -91,10 +89,16 @@ func main() {
 		}
 		mutex.Unlock()
 
-		// send cluster information to client
 		body, err := msgpack.Marshal(&clus)
-		msg.Body = body
-		messaging.SendMultipartMessage(router_socket, &msg)
+		if err != nil {
+			log.Println("encode error:", err)
+			continue
+		}
+
+		// reply must echo the identity + empty delimiter the REQ side expects
+		if err := router_socket.SendMulti(zmq4.NewMsgFrom(req.Frames[0], req.Frames[1], body)); err != nil {
+			log.Println("send error:", err)
+		}
 
 	}
 

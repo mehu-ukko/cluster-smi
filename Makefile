@@ -2,14 +2,12 @@ BIN_DIR := /usr/local/bin
 SYSTEMD_DIR := /etc/systemd/system
 
 all:
-	cd proc; go install
-	go build cluster-smi.go config.go
-	go build cluster-smi-router.go config.go
-	go build cluster-smi-node.go config.go cluster.go
-	go build cluster-smi-local.go config.go cluster.go
+	go build -o cluster-smi cluster-smi.go config.go
+	go build -o cluster-smi-router cluster-smi-router.go config.go
+	go build -o cluster-smi-node cluster-smi-node.go config.go cluster.go
+	go build -o cluster-smi-local cluster-smi-local.go config.go cluster.go
 clean:
-	cd proc; go clean
-	go clean
+	rm -f cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local
 install:
 	install -v cluster-smi-local cluster-smi-node cluster-smi-router cluster-smi $(BIN_DIR)
 	install docs/cluster-smi-node.service $(SYSTEMD_DIR)
