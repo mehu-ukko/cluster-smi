@@ -2,10 +2,10 @@ BIN_DIR := /usr/local/bin
 SYSTEMD_DIR := /etc/systemd/system
 
 all:
-	go build -o cluster-smi cluster-smi.go config.go
-	go build -o cluster-smi-router cluster-smi-router.go config.go
-	go build -o cluster-smi-node cluster-smi-node.go config.go cluster.go
-	go build -o cluster-smi-local cluster-smi-local.go config.go cluster.go
+	go build -o cluster-smi ./cmd/cluster-smi
+	go build -o cluster-smi-router ./cmd/cluster-smi-router
+	go build -o cluster-smi-node ./cmd/cluster-smi-node
+	go build -o cluster-smi-local ./cmd/cluster-smi-local
 clean:
 	rm -f cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local
 install:
@@ -16,7 +16,7 @@ install:
 uninstall:
 	systemctl disable cluster-smi-node.service
 	systemctl stop cluster-smi-node.service
-	rm -f $(SYSTEMD_DIR)/cluster-smi-node.service 
+	rm -f $(SYSTEMD_DIR)/cluster-smi-node.service
 	rm -f $(BIN_DIR)/cluster-smi-local
 	rm -f $(BIN_DIR)/cluster-smi-node
 	rm -f $(BIN_DIR)/cluster-smi-router

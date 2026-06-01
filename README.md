@@ -101,11 +101,11 @@ Make sure, the machines can communicate using the specifiec ports (e.g., `ufw al
 
 ### Use systemd
 
-To ease the use of this app, I suggest to add the *cluster-smi-node* into a systemd-service. An example config file can be found <a href="./docs/cluster-smi-node.example.service">here</a>. The steps would be
+To ease the use of this app, I suggest to add the *cluster-smi-node* into a systemd-service. An example config file can be found <a href="./docs/cluster-smi-node.service">here</a>. The steps would be
 
 ```bash
 # add new entry to systemd
-sudo cp docs/cluster-smi-node.example.service /etc/systemd/system/cluster-smi-node.service
+sudo cp docs/cluster-smi-node.service /etc/systemd/system/cluster-smi-node.service
 # edit the path to cluster-smi-node
 sudo nano /etc/systemd/system/cluster-smi-node.service
 # make sure you can start and stop the service (have a look at you cluster-smi client)

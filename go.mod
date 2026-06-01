@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/NVIDIA/go-nvml v0.13.0-1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
