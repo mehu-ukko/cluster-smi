@@ -131,6 +131,8 @@ scrape_configs:
 | `cluster_smi_gpu_fan_speed_percent` | `node`, `gpu`, `name` | Fan speed |
 | `cluster_smi_gpu_power_watts` | `node`, `gpu`, `name` | Power usage |
 | `cluster_smi_gpu_processes` | `node`, `gpu`, `name` | Number of processes on the GPU |
+| `cluster_smi_gpu_busy` | `node`, `gpu`, `name` | 1 if processes run on the GPU, else 0 |
+| `cluster_smi_gpu_available` | `node`, `gpu`, `name` | 1 if no processes run on the GPU, else 0 |
 | `cluster_smi_gpu_user_memory_used_bytes` | `node`, `gpu`, `name`, `user` | GPU memory used by a user's processes |
 
 GPU metrics of offline nodes are not exported, so their series go stale; `cluster_smi_node_up` stays at 0 for them.

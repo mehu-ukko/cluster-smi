@@ -35,6 +35,10 @@ var (
 		"GPU power usage in watts.", deviceLabels, nil)
 	gpuProcesses = prometheus.NewDesc(namespace+"_gpu_processes",
 		"Number of processes running on the GPU.", deviceLabels, nil)
+	gpuBusy = prometheus.NewDesc(namespace+"_gpu_busy",
+		"Whether processes are running on the GPU (1) or not (0).", deviceLabels, nil)
+	gpuAvailable = prometheus.NewDesc(namespace+"_gpu_available",
+		"Whether no processes are running on the GPU (1) or not (0).", deviceLabels, nil)
 	gpuUserMemoryUsed = prometheus.NewDesc(namespace+"_gpu_user_memory_used_bytes",
 		"GPU memory in bytes used by the processes of a user.", append(deviceLabels, "user"), nil)
 )
@@ -58,7 +62,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		nodeUp, nodeLastSeen,
 		gpuUtilization, gpuMemoryUsed, gpuMemoryTotal, gpuTemperature,
-		gpuFanSpeed, gpuPower, gpuProcesses, gpuUserMemoryUsed,
+		gpuFanSpeed, gpuPower, gpuProcesses, gpuBusy, gpuAvailable, gpuUserMemoryUsed,
 	} {
 		ch <- d
 	}
@@ -97,6 +101,13 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			gauge(gpuFanSpeed, float64(d.FanSpeed))
 			gauge(gpuPower, float64(d.PowerUsage))
 			gauge(gpuProcesses, float64(len(d.Processes)))
+
+			busy := 0.0
+			if len(d.Processes) > 0 {
+				busy = 1
+			}
+			gauge(gpuBusy, busy)
+			gauge(gpuAvailable, 1-busy)
 
 			// aggregate per user: a pid label would explode the series cardinality
 			userMemory := make(map[string]int64)
