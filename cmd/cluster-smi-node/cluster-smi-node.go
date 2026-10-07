@@ -11,6 +11,16 @@ import (
 	"time"
 )
 
+// dialPush returns a PUSH socket connected to addr.
+func dialPush(addr string) (zmq4.Socket, error) {
+	socket := zmq4.NewPush(context.Background())
+	if err := socket.Dial(addr); err != nil {
+		socket.Close()
+		return nil, err
+	}
+	return socket, nil
+}
+
 func main() {
 
 	// load ports and ip-address
@@ -24,19 +34,27 @@ func main() {
 
 	// sending messages (PUSH-PULL)
 	SocketAddr := "tcp://" + cfg.RouterIp + ":" + cfg.Ports.Nodes
+	tick := time.Duration(cfg.Tick) * time.Second
 	log.Println("Now pushing to", SocketAddr)
-	socket := zmq4.NewPush(context.Background())
-	defer socket.Close()
 
-	if err := socket.Dial(SocketAddr); err != nil {
-		log.Fatalf("Failed to dial %s: %s\n", SocketAddr, err.Error())
+	// the router might not be up yet: keep retrying instead of giving up
+	var socket zmq4.Socket
+	for socket == nil {
+		s, err := dialPush(SocketAddr)
+		if err != nil {
+			log.Printf("Failed to dial %s: %s (retrying in %v)\n", SocketAddr, err.Error(), tick)
+			time.Sleep(tick)
+			continue
+		}
+		socket = s
 	}
+	defer func() { socket.Close() }()
 
 	node := &cluster.Node{}
 	clusterapp.InitNode(node)
 
 	log.Println("Cluster-SMI-Node is active. Press CTRL+C to shut down.")
-	for range time.Tick(time.Duration(cfg.Tick) * time.Second) {
+	for range time.Tick(tick) {
 		clusterapp.FetchNode(node)
 
 		// encode data
@@ -45,9 +63,25 @@ func main() {
 			log.Fatal("encode error:", err)
 		}
 
+		// re-establish the connection dropped by a previous send error
+		if socket == nil {
+			s, err := dialPush(SocketAddr)
+			if err != nil {
+				log.Println("redial error:", err)
+				continue
+			}
+			log.Println("Reconnected to", SocketAddr)
+			socket = s
+		}
+
 		// send data
 		if err := socket.Send(zmq4.NewMsg(buf)); err != nil {
+			// zmq4 does not reconnect a PUSH socket on its own: once the router
+			// closed the connection, every further send is silently dropped.
+			// Drop the socket here and dial a fresh one on the next tick.
 			log.Println("send error:", err)
+			socket.Close()
+			socket = nil
 		}
 	}
 

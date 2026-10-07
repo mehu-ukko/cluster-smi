@@ -24,6 +24,16 @@ func RequestUpdateMessage() ([]byte, error) {
 	return msgpack.Marshal(&req)
 }
 
+// dialReq returns a REQ socket connected to addr.
+func dialReq(addr string) (zmq4.Socket, error) {
+	socket := zmq4.NewReq(context.Background())
+	if err := socket.Dial(addr); err != nil {
+		socket.Close()
+		return nil, err
+	}
+	return socket, nil
+}
+
 func main() {
 
 	showTimePtr := flag.Bool("t", false, "show time of events")
@@ -36,20 +46,40 @@ func main() {
 	useColor := flag.Bool("color", true, "use colored output")
 	flag.Parse()
 
-	request_attempts := 0
-
 	// load ports and ip-address
 	cfg := config.Load()
 
-	// ask for updates messages (REQ-ROUTER)
-	request_socket := zmq4.NewReq(context.Background())
-	defer request_socket.Close()
-
 	SocketAddr := "tcp://" + cfg.RouterIp + ":" + cfg.Ports.Clients
-	if err := request_socket.Dial(SocketAddr); err != nil {
-		log.Fatalf("Failed to dial %s: %s\n", SocketAddr, err.Error())
+	tick := time.Duration(cfg.Tick) * time.Second
+
+	// ask for updates messages (REQ-ROUTER)
+	// the router might not be up yet: keep retrying instead of giving up
+	var request_socket zmq4.Socket
+	for request_socket == nil {
+		s, err := dialReq(SocketAddr)
+		if err != nil {
+			log.Printf("Failed to dial %s: %s (retrying in %v)\n", SocketAddr, err.Error(), tick)
+			time.Sleep(tick)
+			continue
+		}
+		request_socket = s
 	}
+	defer func() { request_socket.Close() }()
+
 	for {
+
+		// a REQ socket cannot resume a broken request-reply cycle: whenever one
+		// fails the socket is dropped and a fresh one is dialed here
+		if request_socket == nil {
+			s, err := dialReq(SocketAddr)
+			if err != nil {
+				log.Println("redial error:", err)
+				time.Sleep(tick)
+				continue
+			}
+			log.Println("Reconnected to", SocketAddr)
+			request_socket = s
+		}
 
 		// request new update
 		buf, err := RequestUpdateMessage()
@@ -57,20 +87,20 @@ func main() {
 			log.Fatal("request messsage error:", err)
 		}
 		if err := request_socket.Send(zmq4.NewMsg(buf)); err != nil {
-			log.Fatal("sending request messsage error:", err)
+			log.Println("sending request messsage error:", err)
+			request_socket.Close()
+			request_socket = nil
+			time.Sleep(tick)
+			continue
 		}
 
 		// response from cluster-smi-server
 		msg, err := request_socket.Recv()
 		if err != nil {
 			log.Println(err)
-
-			time.Sleep(10 * time.Second)
-			request_attempts += 1
-
-			if request_attempts == 0 {
-				panic("too many request attempts yielding an error")
-			}
+			request_socket.Close()
+			request_socket = nil
+			time.Sleep(tick)
 			continue
 		}
 
@@ -88,7 +118,7 @@ func main() {
 		clus.Sort()
 		clus.FilterNodes(*nodeRegex)
 		clus.Print(*showProcessesPtr, *showTimePtr, cfg.Timeout, *useColor, *showExtendedPtr, *showDetailPtr)
-		time.Sleep(time.Duration(cfg.Tick) * time.Second)
+		time.Sleep(tick)
 	}
 
 }
