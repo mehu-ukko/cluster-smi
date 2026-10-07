@@ -1,9 +1,10 @@
 cluster-smi.yml
 
-cluster-smi
-cluster-smi-local
-cluster-smi-node
-cluster-smi-router
+# built binaries (anchored, so they don't also match the cmd/<name>/ dirs)
+/cluster-smi
+/cluster-smi-local
+/cluster-smi-node
+/cluster-smi-router
 
 # Go
 *.test
