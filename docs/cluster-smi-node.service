@@ -1,14 +1,15 @@
 [Unit]
-Description=Cluster-Smi-Node
-
-After=network.target local-fs.target multi-user.target
-Requires=network.target local-fs.target multi-user.target
-
+Description=cluster-smi node (pushes GPU stats to cluster-smi-router)
+Wants=network-online.target
+After=network-online.target nvidia-persistenced.service
 
 [Service]
 Type=simple
-StandardOutput=journal+console
-ExecStart=/path/to/cluster-smi-node
+ExecStart=/usr/local/bin/cluster-smi-node
+# /etc/cluster-smi/cluster-smi.yaml or .yml is read by default; uncomment to use another file
+#Environment=CLUSTER_SMI_CONFIG_PATH=/path/to/cluster-smi.yaml
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
