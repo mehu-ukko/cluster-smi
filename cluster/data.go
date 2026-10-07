@@ -45,11 +45,11 @@ type Device struct {
 }
 
 type Node struct {
-	Name       string    `json:"name"`       // hostname
-	Devices    []Device  `json:"devices"`    // devices
-	Time       time.Time `json:"time"`       // current timestamp from message
-	BootTime   int64     `json:"boot_time"`  // uptime of system
-	ClockTicks int64     `json:"clock_ticks` // cpu ticks per second
+	Name       string    `json:"name"`        // hostname
+	Devices    []Device  `json:"devices"`     // devices
+	Time       time.Time `json:"time"`        // current timestamp from message
+	BootTime   int64     `json:"boot_time"`   // uptime of system
+	ClockTicks int64     `json:"clock_ticks"` // cpu ticks per second
 }
 
 func (n *Node) Print() {
