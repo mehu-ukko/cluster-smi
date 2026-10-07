@@ -2,7 +2,7 @@
 //
 // Configuration is read from the YAML file pointed to by the
 // CLUSTER_SMI_CONFIG_PATH environment variable. If the variable is unset
-// or empty, the system-wide file at DefaultConfigPath is tried instead.
+// or empty, the system-wide files in DefaultConfigPaths are tried instead.
 // If neither file can be read or parsed, the defaults defined below are used.
 package config
 
@@ -16,9 +16,12 @@ import (
 // EnvConfigPath is the environment variable pointing to a YAML config file.
 const EnvConfigPath = "CLUSTER_SMI_CONFIG_PATH"
 
-// DefaultConfigPath is the system-wide config file used when
-// CLUSTER_SMI_CONFIG_PATH is unset or empty.
-const DefaultConfigPath = "/etc/cluster-smi/cluster-smi.yaml"
+// DefaultConfigPaths are the system-wide config files tried in order when
+// CLUSTER_SMI_CONFIG_PATH is unset or empty. The first existing one is used.
+var DefaultConfigPaths = []string{
+	"/etc/cluster-smi/cluster-smi.yaml",
+	"/etc/cluster-smi/cluster-smi.yml",
+}
 
 // Default values applied when no configuration file is provided.
 const (
@@ -61,24 +64,34 @@ type Config struct {
 
 // Load returns a Config populated with defaults, optionally overridden by
 // the YAML file at CLUSTER_SMI_CONFIG_PATH or, when that variable is unset,
-// by DefaultConfigPath. If the file cannot be read or parsed, the defaults
-// are kept.
+// by the first existing file in DefaultConfigPaths. If the file cannot be
+// read or parsed, the defaults are kept.
 func Load() Config {
 	c := defaults()
 
-	path := os.Getenv(EnvConfigPath)
-	explicit := path != ""
-	if !explicit {
-		path = DefaultConfigPath
+	paths := DefaultConfigPaths
+	explicit := os.Getenv(EnvConfigPath) != ""
+	if explicit {
+		paths = []string{os.Getenv(EnvConfigPath)}
 	}
 
-	yamlFile, err := os.ReadFile(path)
-	if err != nil {
+	var path string
+	var yamlFile []byte
+	found := false
+	for _, path = range paths {
+		var err error
+		if yamlFile, err = os.ReadFile(path); err == nil {
+			found = true
+			break
+		}
 		// A missing system-wide file is the normal case, so only
 		// complain when the path was requested explicitly.
 		if explicit || !os.IsNotExist(err) {
 			log.Printf("Could not read %s: %v - using default configuration", path, err)
+			return c
 		}
+	}
+	if !found {
 		return c
 	}
 
