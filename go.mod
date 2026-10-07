@@ -5,8 +5,8 @@ go 1.27.1
 require (
 	github.com/NVIDIA/go-nvml v0.13.4-1
 	github.com/go-zeromq/zmq4 v0.17.0
+	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/prometheus/procfs v0.22.0
-	github.com/scylladb/termtables v0.0.0-20191203121021-c4c0b6d42ff4
 	github.com/tklauser/go-sysconf v0.4.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	gopkg.in/yaml.v2 v2.4.0

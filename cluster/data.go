@@ -2,11 +2,13 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/scylladb/termtables"
 	"os/user"
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 type ByName []Node
@@ -180,9 +182,11 @@ func highlight(s string) string {
 
 func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold int, useColor bool, extended bool, show_detail bool) {
 
-	table := termtables.CreateTable()
+	t := table.NewWriter()
+	t.SetStyle(table.StyleDefault)
+	t.Style().Format.Header = text.FormatDefault
 
-	tableHeader := []interface{}{"Node", "Gpu", "Memory-Usage", "GPU-Util"}
+	tableHeader := table.Row{"Node", "Gpu", "Memory-Usage", "GPU-Util"}
 
 	if show_detail {
 		tableHeader = append(tableHeader, "Fan")
@@ -199,11 +203,21 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 	if show_time {
 		tableHeader = append(tableHeader, "Last Seen")
 	}
-	table.AddHeaders(tableHeader...)
+	t.AppendHeader(tableHeader)
+
+	// right-align numeric columns
+	var columnConfigs []table.ColumnConfig
+	for _, name := range []string{"Memory-Usage", "GPU-Util", "Fan", "Temp", "Power", "PID", "GPU Mem", "Runtime"} {
+		columnConfigs = append(columnConfigs, table.ColumnConfig{Name: name, Align: text.AlignRight})
+	}
+	t.SetColumnConfigs(columnConfigs)
 
 	now := time.Now()
 
-	currentUser, _ := user.Current()
+	currentUsername := ""
+	if currentUser, err := user.Current(); err == nil {
+		currentUsername = currentUser.Username
+	}
 
 	for n_id, n := range c.Nodes {
 
@@ -213,7 +227,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 
 		if timeout {
 
-			tableRow := []interface{}{
+			tableRow := table.Row{
 				node_name,
 				"Offline",
 				"",
@@ -232,12 +246,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 				tableRow = append(tableRow, node_lastseen)
 			}
 
-			table.AddRow(tableRow...)
-			table.SetAlign(termtables.AlignRight, 3)
-
-			if show_processes {
-				table.SetAlign(termtables.AlignRight, 5)
-			}
+			t.AppendRow(tableRow)
 
 		} else {
 			for d_id, d := range n.Devices {
@@ -294,7 +303,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 						processRuntime := HumanizeSeconds(p.RunTime)
 						processPID := fmt.Sprintf("%v", p.Pid)
 						processUsername := p.Username
-						if p.Username == currentUser.Username {
+						if p.Username == currentUsername {
 							node_name = highlight(node_name)
 							device_name = highlight(device_name)
 							device_MemoryInfo = highlight(device_MemoryInfo)
@@ -311,7 +320,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 							processRuntime = highlight(processRuntime)
 						}
 
-						tableRow := []interface{}{
+						tableRow := table.Row{
 							node_name,
 							device_name,
 							device_MemoryInfo,
@@ -344,16 +353,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 							}
 						}
 
-						table.AddRow(tableRow...)
-						table.SetAlign(termtables.AlignRight, 3)
-						table.SetAlign(termtables.AlignCenter, 4)
-						if show_processes {
-							table.SetAlign(termtables.AlignRight, 5)
-							// table.SetAlign(termtables.AlignRight, 7)
-							table.SetAlign(termtables.AlignRight, 8)
-							table.SetAlign(termtables.AlignRight, 9)
-							// table.SetAlign(termtables.AlignRight, 9)
-						}
+						t.AppendRow(tableRow)
 					}
 
 				} else {
@@ -361,7 +361,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 						device_name = fmt.Sprintf("\033[0;32m%s\033[0m", device_name)
 					}
 
-					tableRow := []interface{}{
+					tableRow := table.Row{
 						node_name,
 						device_name,
 						device_MemoryInfo,
@@ -384,13 +384,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 						tableRow = append(tableRow, node_lastseen)
 					}
 
-					table.AddRow(tableRow...)
-					table.SetAlign(termtables.AlignRight, 3)
-					if show_processes {
-						table.SetAlign(termtables.AlignRight, 5)
-						table.SetAlign(termtables.AlignRight, 8)
-						table.SetAlign(termtables.AlignRight, 9)
-					}
+					t.AppendRow(tableRow)
 
 				}
 
@@ -398,7 +392,7 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 		}
 
 		if n_id < len(c.Nodes)-1 {
-			table.AddSeparator()
+			t.AppendSeparator()
 		}
 	}
 	fmt.Printf("\033[2J")
@@ -428,5 +422,5 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 	// fmt.Printf("\033[4;37m color here \033[0m") // White
 	// fmt.Printf("\033[0m color here \033[0m")
 	fmt.Println(time.Now().Format("Mon Jan 2 15:04:05 2006") + " (http://github.com/patwie/cluster-smi)")
-	fmt.Println(table.Render())
+	fmt.Println(t.Render())
 }
