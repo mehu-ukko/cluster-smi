@@ -93,6 +93,8 @@ c.Ports.Clients = "9081"
 
 Otherwise, set `CLUSTER_SMI_CONFIG_PATH` to a YAML file (see `cluster-smi.example.yml`).
 
+The config file may set `includepath` to a directory (e.g. `/etc/cluster-smi/cluster-smi.d`). The `.yaml` and `.yml` files in it are read in alphabetical order, and each overrides the values set before it. A relative `includepath` is resolved against the directory of the main config file.
+
 
 ### Run
 
