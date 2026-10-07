@@ -54,26 +54,22 @@ jobs:
             cluster-smi
             cluster-smi-router
 
-  # NOTE: CUDA build stays amd64-only because the nvidia/cuda container
-  # image we use is published for linux/amd64 only.
+  # NOTE: cluster-smi-node / cluster-smi-local need cgo (github.com/NVIDIA/go-nvml
+  # and the proc wrapper), but no CUDA toolkit: go-nvml ships its own nvml.h and
+  # dlopens libnvidia-ml.so.1 at runtime. Stays amd64-only because cgo would
+  # otherwise need an aarch64 cross-toolchain.
   build-cuda:
-    name: build (with CUDA)
+    name: build (cgo, NVML)
     runs-on: ubuntu-latest
-    container:
-      image: nvidia/cuda:12.4.0-devel-ubuntu22.04
+    env:
+      CGO_ENABLED: '1'
     steps:
-      - name: Install build deps
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates curl git build-essential pkg-config
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Build
         run: |
-          export CGO_LDFLAGS="-L/usr/local/cuda/lib64/stubs"
           go build -o cluster-smi ./cmd/cluster-smi
           go build -o cluster-smi-router ./cmd/cluster-smi-router
           go build -o cluster-smi-node ./cmd/cluster-smi-node

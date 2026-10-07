@@ -9,7 +9,6 @@ import (
 	"github.com/patwie/cluster-smi/cluster"
 	"github.com/patwie/cluster-smi/internal/clusterapp"
 	"github.com/patwie/cluster-smi/internal/config"
-	"github.com/patwie/cluster-smi/nvml"
 	"log"
 	"time"
 )
@@ -31,10 +30,10 @@ func main() {
 	useColor := flag.Bool("color", true, "use colored output")
 	flag.Parse()
 
-	if err := nvml.InitNVML(); err != nil {
+	if err := clusterapp.InitNVML(); err != nil {
 		log.Fatalf("Failed initializing NVML: %s\n", err.Error())
 	}
-	defer nvml.ShutdownNVML()
+	defer clusterapp.ShutdownNVML()
 
 	node := cluster.Node{}
 	clusterapp.InitNode(&node)

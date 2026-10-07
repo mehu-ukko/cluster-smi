@@ -51,7 +51,7 @@ Thu Jan 18 21:44:51 2018
 
 <p align="center"> <img src="./cluster-smi.jpg" width="100%"> </p>
 
-On each machine you want to monitor you need to start *cluster-smi-node*. They are sending information from the nvidia-driver to a *cluster-smi-router*, which further distributes these information to client (*cluster-smi*) when requested. Only the machines running *cluster-smi-node* require CUDA dependencies.
+On each machine you want to monitor you need to start *cluster-smi-node*. They are sending information from the nvidia-driver to a *cluster-smi-router*, which further distributes these information to client (*cluster-smi*) when requested. Only the machines running *cluster-smi-node* require an NVIDIA driver.
 
 You might be interested as well in [cluster-top](https://github.com/PatWie/cluster-top) for CPUS.
 
@@ -71,7 +71,10 @@ ZeroMQ is now a pure-Go dependency, so the binaries have no external `libzmq` re
 Requirements:
 
 - Go 1.21+
-- For `cluster-smi-node` / `cluster-smi-local` only: CUDA toolkit (provides `libnvidia-ml`)
+- For `cluster-smi-node` / `cluster-smi-local` only: a C compiler (`cgo`). No CUDA
+  toolkit or NVML headers are needed — [go-nvml](https://github.com/NVIDIA/go-nvml)
+  ships its own `nvml.h` and loads `libnvidia-ml.so.1` from the installed NVIDIA
+  driver at runtime.
 
 ```bash
 cp config.example.go config.go

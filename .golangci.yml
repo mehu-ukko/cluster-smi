@@ -1,9 +1,5 @@
 version: "2"
 
-run:
-  build-tags:
-    - cuda
-
 linters:
   default: none
   enable:
@@ -24,9 +20,6 @@ linters:
 
   exclusions:
     rules:
-      # NVML cgo wrapper requires CUDA headers; not built on default lint runs.
-      - path: nvml/
-        linters: [unused, errcheck, staticcheck]
       # proc cgo wrapper depends on Linux headers.
       - path: proc/
         linters: [unused, errcheck, staticcheck]

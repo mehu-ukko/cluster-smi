@@ -1,4 +1,0 @@
-The original code in this directory is borrowed from:
-https://github.com/tankbusta/nvidia_exporter
-
-I modified some parts.

@@ -6,7 +6,6 @@ import (
 	"github.com/patwie/cluster-smi/cluster"
 	"github.com/patwie/cluster-smi/internal/clusterapp"
 	"github.com/patwie/cluster-smi/internal/config"
-	"github.com/patwie/cluster-smi/nvml"
 	"github.com/vmihailenco/msgpack/v5"
 	"log"
 	"time"
@@ -18,10 +17,10 @@ func main() {
 	cfg := config.Load()
 	cfg.Print()
 
-	if err := nvml.InitNVML(); err != nil {
+	if err := clusterapp.InitNVML(); err != nil {
 		log.Fatalf("Failed initializing NVML: %s\n", err.Error())
 	}
-	defer nvml.ShutdownNVML()
+	defer clusterapp.ShutdownNVML()
 
 	// sending messages (PUSH-PULL)
 	SocketAddr := "tcp://" + cfg.RouterIp + ":" + cfg.Ports.Nodes
