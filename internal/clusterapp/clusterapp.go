@@ -133,14 +133,19 @@ func FetchNode(n *cluster.Node) {
 				continue
 			}
 
-			pidInfo := proc.InfoFromPid(pid)
-
-			uid := proc.UIDFromPID(pid)
-			usr, lookupErr := user.LookupId(strconv.Itoa(uid))
+			// the process may have exited, or live in another PID namespace
+			name := "unknown"
+			var runTime int64
+			if pidInfo, err := proc.InfoFromPid(pid); err == nil {
+				name = pidInfo.Command
+				runTime = (currentTime - n.BootTime) - (pidInfo.StartTime / n.ClockTicks)
+			}
 
 			username := "unknown"
-			if lookupErr == nil {
-				username = usr.Username
+			if uid, err := proc.UIDFromPID(pid); err == nil {
+				if usr, err := user.LookupId(strconv.Itoa(uid)); err == nil {
+					username = usr.Username
+				}
 			}
 
 			extendedCommand := proc.CmdFromPID(pid)
@@ -148,9 +153,9 @@ func FetchNode(n *cluster.Node) {
 			processes = append(processes, cluster.Process{
 				Pid:             pid,
 				UsedGpuMemory:   int64(deviceProc.UsedGpuMemory),
-				Name:            pidInfo.Command,
+				Name:            name,
 				Username:        username,
-				RunTime:         (currentTime - n.BootTime) - (pidInfo.StartTime / n.ClockTicks),
+				RunTime:         runTime,
 				ExtendedCommand: extendedCommand,
 			})
 		}

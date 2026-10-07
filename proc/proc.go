@@ -1,116 +1,89 @@
+// Package proc reads process and system information from /proc.
 package proc
 
-// #include "proc.h"
-// #include <stdlib.h>
-import "C"
-import "unsafe"
-import "errors"
-import "strconv"
-import "io/ioutil"
+import (
+	"strings"
+	"time"
+
+	"github.com/prometheus/procfs"
+	"github.com/tklauser/go-sysconf"
+)
 
 // PIDInfo is a collection of properties for a process
 type PIDInfo struct {
 	PID       int
 	Command   string
 	UsedTime  int64
-	StartTime int64
-	UpTime    int64
+	StartTime int64 // clock ticks after system boot
 }
 
-// ClockTicks returns ticks per clock cycle
+// ClockTicks returns the number of clock ticks per second (USER_HZ)
 func ClockTicks() int64 {
-	hz := C.long(0)
-	C.clock_ticks(&hz)
-	return int64(hz)
+	hz, err := sysconf.Sysconf(sysconf.SC_CLK_TCK)
+	if err != nil || hz <= 0 {
+		return 100
+	}
+	return hz
 }
 
 // TimeOfDay returns current time-stamp
 func TimeOfDay() int64 {
-	val := C.float(0)
-	C.time_of_day(&val)
-	return int64(val)
+	return time.Now().Unix()
 }
 
-// BootTime returns timestamps when machine was started
+// BootTime returns the Unix timestamp at which the machine was started
 func BootTime() (int64, error) {
-	uptime := C.float(0)
-	idletime := C.float(0)
-	success := C.int(0)
-	success = C.boot_time(&uptime, &idletime)
-
-	if int(success) == 0 {
-		return 0, errors.New("cannot get bootime")
-	}
-
-	return TimeOfDay() - int64(uptime), nil
-}
-
-func mallocCStringBuffer(size uint) *C.char {
-	buf := make([]byte, size)
-	return C.CString(string(buf))
-}
-
-// CPUTick returns the total number of Jiffies
-func CPUTick() (t int64) {
-	return int64(C.read_cpu_tick())
-}
-
-// InfoFromPid returns used time (int) and command (string)
-func InfoFromPid(pid int) PIDInfo {
-
-	info := PIDInfo{}
-
-	usedTime := C.ulong(0)
-	startTime := C.ulonglong(0)
-
-	var cDst *C.char = mallocCStringBuffer(128 + 1)
-	defer C.free(unsafe.Pointer(cDst))
-
-	C.read_pid_info(C.ulong(pid), &usedTime, &startTime, cDst)
-
-	info.PID = pid
-	info.Command = C.GoString(cDst)
-	info.UsedTime = int64(usedTime)
-	info.StartTime = int64(startTime)
-
-	return info
-}
-
-// NumberCPUCores returns number of CPU cores
-func NumberCPUCores() (n int) {
-	return int(C.num_cores())
-}
-
-// UIDFromPID returns user id (UID) for a given process id (PID)
-func UIDFromPID(pid int) (uid int) {
-	cUID := C.ulong(0)
-	C.get_uid_from_pid(C.ulong(pid), &cUID)
-	return int(cUID)
-}
-
-// CmdFromPID returns cmd which initiated the process
-func CmdFromPID(pid int) string {
-	fn := "/proc/" + strconv.Itoa(pid) + "/cmdline"
-	b, err := ioutil.ReadFile(fn) // just pass the file name
+	fs, err := procfs.NewDefaultFS()
 	if err != nil {
-		return "unkown"
+		return 0, err
 	}
-
-	return string(b)
-	// var cCMD *C.char = mallocCStringBuffer(128 + 1)
-	// defer C.free(unsafe.Pointer(cCMD))
-
-	// C.get_cmd(C.ulong(pid), cCMD)
-
-	// return C.GoString(cCMD)
+	stat, err := fs.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return int64(stat.BootTime), nil
 }
 
-// GetRAMMemoryInfo returns memory information of RAM
-func GetRAMMemoryInfo() (total int64, free int64, available int64) {
-	cTotal := C.ulong(0)
-	cFree := C.ulong(0)
-	cAvailable := C.ulong(0)
-	C.get_mem(&cTotal, &cFree, &cAvailable)
+// InfoFromPid returns name, used CPU time and start time of a process
+func InfoFromPid(pid int) (PIDInfo, error) {
+	p, err := procfs.NewProc(pid)
+	if err != nil {
+		return PIDInfo{PID: pid}, err
+	}
+	stat, err := p.Stat()
+	if err != nil {
+		return PIDInfo{PID: pid}, err
+	}
+	return PIDInfo{
+		PID:       pid,
+		Command:   stat.Comm,
+		UsedTime:  int64(stat.UTime + stat.STime),
+		StartTime: int64(stat.Starttime),
+	}, nil
+}
 
-	return int64(cTotal), int64(cFree), int64(cAvailable)
+// UIDFromPID returns the real user id (UID) for a given process id (PID)
+func UIDFromPID(pid int) (int, error) {
+	p, err := procfs.NewProc(pid)
+	if err != nil {
+		return 0, err
+	}
+	status, err := p.NewStatus()
+	if err != nil {
+		return 0, err
+	}
+	return int(status.UIDs[0]), nil
+}
+
+// CmdFromPID returns the space-separated command line of a process
+func CmdFromPID(pid int) string {
+	p, err := procfs.NewProc(pid)
+	if err != nil {
+		return "unknown"
+	}
+	args, err := p.CmdLine()
+	if err != nil || len(args) == 0 {
+		return "unknown"
+	}
+	return strings.Join(args, " ")
 }
