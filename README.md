@@ -70,7 +70,7 @@ ZeroMQ is now a pure-Go dependency, so the binaries have no external `libzmq` re
 
 Requirements:
 
-- Go 1.21+
+- Go 1.27.1+
 - For `cluster-smi-node` / `cluster-smi-local` only: a C compiler (`cgo`). No CUDA
   toolkit or NVML headers are needed — [go-nvml](https://github.com/NVIDIA/go-nvml)
   ships its own `nvml.h` and loads `libnvidia-ml.so.1` from the installed NVIDIA
