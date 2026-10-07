@@ -2,7 +2,8 @@
 //
 // Configuration is read from the YAML file pointed to by the
 // CLUSTER_SMI_CONFIG_PATH environment variable. If the variable is unset
-// or empty, the defaults defined below are used.
+// or empty, the system-wide file at DefaultConfigPath is tried instead.
+// If neither file can be read or parsed, the defaults defined below are used.
 package config
 
 import (
@@ -14,6 +15,10 @@ import (
 
 // EnvConfigPath is the environment variable pointing to a YAML config file.
 const EnvConfigPath = "CLUSTER_SMI_CONFIG_PATH"
+
+// DefaultConfigPath is the system-wide config file used when
+// CLUSTER_SMI_CONFIG_PATH is unset or empty.
+const DefaultConfigPath = "/etc/cluster-smi/cluster-smi.yaml"
 
 // Default values applied when no configuration file is provided.
 const (
@@ -45,11 +50,45 @@ type Config struct {
 		Nodes   string `yaml:"nodes"`   // port of cluster-smi-router, which nodes send to
 		Clients string `yaml:"clients"` // port of cluster-smi-router, where clients subscribe to
 	} `yaml:"ports"`
+
+	source string // file the configuration was read from, empty when defaults are used
 }
 
 // Load returns a Config populated with defaults, optionally overridden by
-// the YAML file at CLUSTER_SMI_CONFIG_PATH.
+// the YAML file at CLUSTER_SMI_CONFIG_PATH or, when that variable is unset,
+// by DefaultConfigPath. If the file cannot be read or parsed, the defaults
+// are kept.
 func Load() Config {
+	c := defaults()
+
+	path := os.Getenv(EnvConfigPath)
+	explicit := path != ""
+	if !explicit {
+		path = DefaultConfigPath
+	}
+
+	yamlFile, err := os.ReadFile(path)
+	if err != nil {
+		// A missing system-wide file is the normal case, so only
+		// complain when the path was requested explicitly.
+		if explicit || !os.IsNotExist(err) {
+			log.Printf("Could not read %s: %v - using default configuration", path, err)
+		}
+		return c
+	}
+
+	parsed := defaults()
+	if err := yaml.Unmarshal(yamlFile, &parsed); err != nil {
+		log.Printf("Could not parse %s: %v - using default configuration", path, err)
+		return c
+	}
+
+	parsed.source = path
+	return parsed
+}
+
+// defaults returns a Config populated with the built-in default values.
+func defaults() Config {
 	c := Config{}
 
 	c.RouterIp = DefaultRouterIP
@@ -58,27 +97,13 @@ func Load() Config {
 	c.Ports.Nodes = DefaultPortNodes
 	c.Ports.Clients = DefaultPortClients
 
-	path := os.Getenv(EnvConfigPath)
-	if path == "" {
-		return c
-	}
-
-	yamlFile, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalf("Error: %v ", err)
-	}
-
-	if err := yaml.Unmarshal(yamlFile, &c); err != nil {
-		log.Fatalf("Error in %s %v", path, err)
-	}
-
 	return c
 }
 
 // Print logs the active configuration values.
 func (c Config) Print() {
-	if path := os.Getenv(EnvConfigPath); path != "" {
-		log.Println("Read configuration from", path)
+	if c.source != "" {
+		log.Println("Read configuration from", c.source)
 	} else {
 		log.Println("use default configuration")
 	}
