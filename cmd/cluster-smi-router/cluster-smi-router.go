@@ -5,9 +5,14 @@ import (
 	"github.com/go-zeromq/zmq4"
 	"github.com/patwie/cluster-smi/cluster"
 	"github.com/patwie/cluster-smi/internal/config"
+	"github.com/patwie/cluster-smi/internal/exporter"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/vmihailenco/msgpack/v5"
 	"log"
+	"net/http"
 	"sync"
+	"time"
 )
 
 // intermediate struct (under mutex lock)
@@ -21,6 +26,34 @@ func main() {
 
 	allNodes = make(map[string]cluster.Node)
 	var mutex = &sync.Mutex{}
+
+	// copy the current nodes out of the map (under mutex lock)
+	snapshot := func() []cluster.Node {
+		mutex.Lock()
+		defer mutex.Unlock()
+		nodes := make([]cluster.Node, 0, len(allNodes))
+		for _, n := range allNodes {
+			nodes = append(nodes, n)
+		}
+		return nodes
+	}
+
+	// serving Prometheus metrics (optional)
+	if cfg.Ports.Metrics != "" {
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(exporter.New(snapshot, time.Duration(cfg.Timeout)*time.Second))
+
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+
+		go func() {
+			MetricsAddr := ":" + cfg.Ports.Metrics
+			log.Println("Serving Prometheus metrics at", MetricsAddr+"/metrics")
+			if err := http.ListenAndServe(MetricsAddr, mux); err != nil {
+				log.Fatalf("Failed to serve metrics at %s: %s\n", MetricsAddr, err.Error())
+			}
+		}()
+	}
 
 	// message loop
 	log.Println("Cluster-SMI-Router is active. Press CTRL+C to shut down.")
@@ -79,13 +112,7 @@ func main() {
 			continue
 		}
 
-		mutex.Lock()
-		// rebuild cluster struct from map
-		clus := cluster.Cluster{}
-		for _, n := range allNodes {
-			clus.Nodes = append(clus.Nodes, n)
-		}
-		mutex.Unlock()
+		clus := cluster.Cluster{Nodes: snapshot()}
 
 		body, err := msgpack.Marshal(&clus)
 		if err != nil {

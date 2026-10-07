@@ -4,3 +4,4 @@ router_ip: 127.0.0.1     # ip of cluster-smi-server
 ports:
   nodes: 9090            # port of cluster-smi-server, which nodes send to
   clients: 9091          # port of cluster-smi-server, where clients subscribe to
+  metrics: 9082          # optional: port of cluster-smi-server serving Prometheus /metrics (omit to disable)

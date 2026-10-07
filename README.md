@@ -102,6 +102,39 @@ Otherwise, set `CLUSTER_SMI_CONFIG_PATH` to a YAML file (see `cluster-smi.exampl
 
 Make sure, the machines can communicate using the specifiec ports (e.g., `ufw allow 9080, 9081`)
 
+### Prometheus
+
+*cluster-smi-router* can export the collected GPU stats of all nodes to Prometheus. Set a metrics port in the YAML config to enable it:
+
+```yaml
+ports:
+  metrics: 9082
+```
+
+The metrics are then served at `http://<router>:9082/metrics`, so Prometheus only needs to scrape the router:
+
+```yaml
+scrape_configs:
+  - job_name: cluster-smi
+    static_configs:
+      - targets: ["router-host:9082"]
+```
+
+| Metric | Labels | Description |
+|---|---|---|
+| `cluster_smi_node_up` | `node` | 1 if the node reported within `timeout`, else 0 |
+| `cluster_smi_node_last_seen_timestamp_seconds` | `node` | Unix time of the last report |
+| `cluster_smi_gpu_utilization_percent` | `node`, `gpu`, `name` | GPU utilization |
+| `cluster_smi_gpu_memory_used_bytes` | `node`, `gpu`, `name` | Used GPU memory |
+| `cluster_smi_gpu_memory_total_bytes` | `node`, `gpu`, `name` | Total GPU memory |
+| `cluster_smi_gpu_temperature_celsius` | `node`, `gpu`, `name` | GPU temperature |
+| `cluster_smi_gpu_fan_speed_percent` | `node`, `gpu`, `name` | Fan speed |
+| `cluster_smi_gpu_power_watts` | `node`, `gpu`, `name` | Power usage |
+| `cluster_smi_gpu_processes` | `node`, `gpu`, `name` | Number of processes on the GPU |
+| `cluster_smi_gpu_user_memory_used_bytes` | `node`, `gpu`, `name`, `user` | GPU memory used by a user's processes |
+
+GPU metrics of offline nodes are not exported, so their series go stale; `cluster_smi_node_up` stays at 0 for them.
+
 ### Use systemd
 
 To ease the use of this app, I suggest to add the *cluster-smi-node* into a systemd-service. An example config file can be found <a href="./docs/cluster-smi-node.service">here</a>. The steps would be
