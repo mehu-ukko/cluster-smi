@@ -134,10 +134,10 @@ func FetchNode(n *cluster.Node) {
 			}
 
 			// the process may have exited, or live in another PID namespace
-			name := "unknown"
+			command := "unknown"
 			var runTime int64
 			if pidInfo, err := proc.InfoFromPid(pid); err == nil {
-				name = pidInfo.Command
+				command = pidInfo.Command
 				runTime = (currentTime - n.BootTime) - (pidInfo.StartTime / n.ClockTicks)
 			}
 
@@ -153,7 +153,7 @@ func FetchNode(n *cluster.Node) {
 			processes = append(processes, cluster.Process{
 				Pid:             pid,
 				UsedGpuMemory:   int64(deviceProc.UsedGpuMemory),
-				Name:            name,
+				Name:            command,
 				Username:        username,
 				RunTime:         runTime,
 				ExtendedCommand: extendedCommand,

@@ -19,6 +19,9 @@ linters:
         - composites
 
   exclusions:
+    # Unchecked errors from Close() and similar.
+    presets:
+      - std-error-handling
     rules:
       # proc cgo wrapper depends on Linux headers.
       - path: proc/

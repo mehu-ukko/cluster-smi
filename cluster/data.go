@@ -150,7 +150,6 @@ func HumanizeSeconds(secs int64) string {
 		} else {
 			answer = fmt.Sprintf("%s   %2d sec", answer, seconds)
 		}
-		has_prefix = true
 	} else {
 		if has_prefix {
 			answer = fmt.Sprintf("%s  0 sec", answer)

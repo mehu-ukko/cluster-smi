@@ -86,7 +86,7 @@ func main() {
 		if err != nil {
 			log.Fatal("request messsage error:", err)
 		}
-		if err := request_socket.Send(zmq4.NewMsg(buf)); err != nil {
+		if err = request_socket.Send(zmq4.NewMsg(buf)); err != nil {
 			log.Println("sending request messsage error:", err)
 			request_socket.Close()
 			request_socket = nil

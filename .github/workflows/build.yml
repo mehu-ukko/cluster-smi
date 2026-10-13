@@ -8,50 +8,38 @@ on:
     branches: [master]
 
 env:
-  GO_VERSION: '1.27'
-  GOLANGCI_LINT_VERSION: v2.1.0
+  GOLANGCI_LINT_VERSION: v2.14.0
 
 jobs:
   lint:
     name: lint (golangci-lint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - uses: golangci/golangci-lint-action@v8
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
   build:
-    name: build
+    name: build (linux/amd64)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        goos: [linux]
-        goarch: [amd64]
     env:
-      GOOS: ${{ matrix.goos }}
-      GOARCH: ${{ matrix.goarch }}
       CGO_ENABLED: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Build
-        run: |
-          go build -o cluster-smi ./cmd/cluster-smi
-          go build -o cluster-smi-router ./cmd/cluster-smi-router
-          go build -o cluster-smi-node ./cmd/cluster-smi-node
-          go build -o cluster-smi-local ./cmd/cluster-smi-local
+        run: make
       - name: Vet
-        run: go vet ./cluster/... ./cmd/... ./internal/... ./proc/...
-      - uses: actions/upload-artifact@v4
+        run: go vet ./...
+      - uses: actions/upload-artifact@v7
         with:
-          name: cluster-smi-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: cluster-smi-linux-amd64
           path: |
             cluster-smi
             cluster-smi-router
@@ -60,20 +48,22 @@ jobs:
 
   release:
     name: release
-    needs: [build]
+    needs: [lint, build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: cluster-smi-linux-amd64
           path: artifacts/cluster-smi-linux-amd64
       - name: Package
         run: |
-          cd artifacts/cluster-smi-linux-amd64 && chmod +x * && tar czf ../../cluster-smi-${GITHUB_REF_NAME}-linux-amd64.tar.gz cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local && cd ../..
-      - uses: softprops/action-gh-release@v2
+          cd artifacts/cluster-smi-linux-amd64
+          chmod +x cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local
+          tar czf "$GITHUB_WORKSPACE/cluster-smi-${GITHUB_REF_NAME}-linux-amd64.tar.gz" cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             cluster-smi-*-linux-amd64.tar.gz
