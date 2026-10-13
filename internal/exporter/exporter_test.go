@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patwie/cluster-smi/cluster"
+	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 

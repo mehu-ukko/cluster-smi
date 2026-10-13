@@ -1,7 +1,9 @@
 # CLUSTER-SMI
-[![build](https://github.com/patwie/cluster-smi/actions/workflows/build.yml/badge.svg)](https://github.com/patwie/cluster-smi/actions/workflows/build.yml)
+[![build](https://github.com/mehu-ukko/cluster-smi/actions/workflows/build.yml/badge.svg)](https://github.com/mehu-ukko/cluster-smi/actions/workflows/build.yml)
 
 The same as `nvidia-smi` but for multiple machines.
+
+This is a fork of [patwie/cluster-smi](https://github.com/patwie/cluster-smi).
 
 Run `cluster-smi` and the output should be something like
 
@@ -59,10 +61,7 @@ You might be interested as well in [cluster-top](https://github.com/PatWie/clust
 
 ### Pre-built binaries
 
-Download the latest release from the [releases page](https://github.com/patwie/cluster-smi/releases). Two archives are published per release:
-
-- `cluster-smi-<tag>-linux-amd64.tar.gz` — `cluster-smi` and `cluster-smi-router` (no CUDA needed)
-- `cluster-smi-<tag>-cuda-linux-amd64.tar.gz` — also includes `cluster-smi-node` and `cluster-smi-local` (require an NVIDIA driver at runtime)
+Download `cluster-smi-<tag>-linux-amd64.tar.gz` from the [releases page](https://github.com/mehu-ukko/cluster-smi/releases). It contains all four binaries. Only `cluster-smi-node` and `cluster-smi-local` need an NVIDIA driver at runtime; `cluster-smi` and `cluster-smi-router` run anywhere.
 
 ZeroMQ is now a pure-Go dependency, so the binaries have no external `libzmq` requirement.
 
@@ -77,21 +76,23 @@ Requirements:
   driver at runtime.
 
 ```bash
-cp config.example.go config.go
-make all
+make
 ```
 
-To embed configuration into the binary, edit `config.go` (compile-time defaults for ports and router IP):
+### Configuration
 
-```go
-c.RouterIp = "127.0.0.1"
-c.Tick = 3
-c.Timeout = 180
-c.Ports.Nodes = "9080"
-c.Ports.Clients = "9081"
-```
+The binaries read their configuration from the YAML file named by `CLUSTER_SMI_CONFIG_PATH`. If that variable is unset, they try `/etc/cluster-smi/cluster-smi.yaml` and then `/etc/cluster-smi/cluster-smi.yml`. See `cluster-smi.example.yml` for the available keys; `make install` installs it as `/etc/cluster-smi/cluster-smi.yaml`.
 
-Otherwise, set `CLUSTER_SMI_CONFIG_PATH` to a YAML file (see `cluster-smi.example.yml`).
+Without a config file, these defaults are used:
+
+| Key | Default |
+|---|---|
+| `router_ip` | `127.0.0.1` |
+| `tick` | `3` |
+| `timeout` | `180` |
+| `ports.nodes` | `9080` |
+| `ports.clients` | `9081` |
+| `ports.metrics` | unset (Prometheus exporter disabled) |
 
 The config file may set `includepath` to a directory (e.g. `/etc/cluster-smi/cluster-smi.d`). The `.yaml` and `.yml` files in it are read in alphabetical order, and each overrides the values set before it. A relative `includepath` is resolved against the directory of the main config file.
 

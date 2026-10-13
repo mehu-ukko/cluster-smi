@@ -420,6 +420,6 @@ func (c *Cluster) Print(show_processes bool, show_time bool, timeout_threshold i
 	// fmt.Printf("\033[4;36m color here \033[0m") // Cyan
 	// fmt.Printf("\033[4;37m color here \033[0m") // White
 	// fmt.Printf("\033[0m color here \033[0m")
-	fmt.Println(time.Now().Format("Mon Jan 2 15:04:05 2006") + " (http://github.com/patwie/cluster-smi)")
+	fmt.Println(time.Now().Format("Mon Jan 2 15:04:05 2006") + " (http://github.com/mehu-ukko/cluster-smi)")
 	fmt.Println(t.Render())
 }

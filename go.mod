@@ -1,4 +1,4 @@
-module github.com/patwie/cluster-smi
+module github.com/mehu-ukko/cluster-smi
 
 go 1.27.1
 

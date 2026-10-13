@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/NVIDIA/go-nvml/pkg/nvml"
-	"github.com/patwie/cluster-smi/cluster"
-	"github.com/patwie/cluster-smi/proc"
+	"github.com/mehu-ukko/cluster-smi/cluster"
+	"github.com/mehu-ukko/cluster-smi/proc"
 )
 
 // InitNVML loads libnvidia-ml and initializes NVML. A successful call must be

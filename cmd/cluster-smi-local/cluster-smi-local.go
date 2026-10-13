@@ -6,9 +6,9 @@ This is simply reproducing "nvidia-smi" without networking.
 
 import (
 	"flag"
-	"github.com/patwie/cluster-smi/cluster"
-	"github.com/patwie/cluster-smi/internal/clusterapp"
-	"github.com/patwie/cluster-smi/internal/config"
+	"github.com/mehu-ukko/cluster-smi/cluster"
+	"github.com/mehu-ukko/cluster-smi/internal/clusterapp"
+	"github.com/mehu-ukko/cluster-smi/internal/config"
 	"log"
 	"time"
 )

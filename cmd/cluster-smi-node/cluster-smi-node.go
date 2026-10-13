@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"github.com/go-zeromq/zmq4"
-	"github.com/patwie/cluster-smi/cluster"
-	"github.com/patwie/cluster-smi/internal/clusterapp"
-	"github.com/patwie/cluster-smi/internal/config"
+	"github.com/mehu-ukko/cluster-smi/cluster"
+	"github.com/mehu-ukko/cluster-smi/internal/clusterapp"
+	"github.com/mehu-ukko/cluster-smi/internal/config"
 	"github.com/vmihailenco/msgpack/v5"
 	"log"
 	"time"
