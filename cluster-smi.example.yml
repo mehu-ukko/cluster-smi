@@ -3,6 +3,6 @@ timeout: 180             # duration considered as timeout (machine is considered
 router_ip: 127.0.0.1     # ip of cluster-smi-server
 includepath: /etc/cluster-smi/cluster-smi.d  # optional: *.yaml/*.yml files in here override these values (alphabetical order)
 ports:
-  nodes: 9090            # port of cluster-smi-server, which nodes send to
-  clients: 9091          # port of cluster-smi-server, where clients subscribe to
+  nodes: 9080            # port of cluster-smi-server, which nodes send to
+  clients: 9081          # port of cluster-smi-server, where clients subscribe to
   metrics: 9082          # optional: port of cluster-smi-server serving Prometheus /metrics (omit to disable)
