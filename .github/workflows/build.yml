@@ -37,6 +37,8 @@ jobs:
         run: make
       - name: Vet
         run: go vet ./...
+      - name: Test
+        run: go test ./...
       - uses: actions/upload-artifact@v7
         with:
           name: cluster-smi-linux-amd64
