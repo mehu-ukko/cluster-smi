@@ -2,11 +2,14 @@ BIN_DIR := /usr/local/bin
 SYSTEMD_DIR := /etc/systemd/system
 CONFIG_DIR := /etc/cluster-smi
 
+VERSION ?= $(or $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//'),dev)
+LDFLAGS := -X main.version=$(VERSION)
+
 all:
-	go build -o cluster-smi ./cmd/cluster-smi
-	go build -o cluster-smi-router ./cmd/cluster-smi-router
-	go build -o cluster-smi-node ./cmd/cluster-smi-node
-	go build -o cluster-smi-local ./cmd/cluster-smi-local
+	go build -ldflags "$(LDFLAGS)" -o cluster-smi ./cmd/cluster-smi
+	go build -ldflags "$(LDFLAGS)" -o cluster-smi-router ./cmd/cluster-smi-router
+	go build -ldflags "$(LDFLAGS)" -o cluster-smi-node ./cmd/cluster-smi-node
+	go build -ldflags "$(LDFLAGS)" -o cluster-smi-local ./cmd/cluster-smi-local
 
 clean:
 	rm -f cluster-smi cluster-smi-router cluster-smi-node cluster-smi-local

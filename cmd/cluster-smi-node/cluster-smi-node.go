@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"github.com/go-zeromq/zmq4"
 	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/mehu-ukko/cluster-smi/internal/clusterapp"
@@ -10,6 +12,9 @@ import (
 	"log"
 	"time"
 )
+
+// set at build time via -ldflags "-X main.version=..."
+var version = "dev"
 
 // dialPush returns a PUSH socket connected to addr.
 func dialPush(addr string) (zmq4.Socket, error) {
@@ -22,6 +27,14 @@ func dialPush(addr string) (zmq4.Socket, error) {
 }
 
 func main() {
+
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	// load ports and ip-address
 	cfg := config.Load()

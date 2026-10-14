@@ -6,6 +6,7 @@ This is simply reproducing "nvidia-smi" without networking.
 
 import (
 	"flag"
+	"fmt"
 	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/mehu-ukko/cluster-smi/internal/clusterapp"
 	"github.com/mehu-ukko/cluster-smi/internal/config"
@@ -13,12 +14,12 @@ import (
 	"time"
 )
 
+// set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 var clus cluster.Cluster
 
 func main() {
-
-	// load ports and ip-address
-	cfg := config.Load()
 
 	showTimePtr := flag.Bool("t", false, "show time of events")
 	showExtendedPtr := flag.Bool("e", false, "extended view")
@@ -28,7 +29,16 @@ func main() {
 		"(if not specified, all nodes will be shown)")
 	usernameFilter := flag.String("u", "", "show all information only for specific user")
 	useColor := flag.Bool("color", true, "use colored output")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+
+	// load ports and ip-address
+	cfg := config.Load()
 
 	if err := clusterapp.InitNVML(); err != nil {
 		log.Fatalf("Failed initializing NVML: %s\n", err.Error())

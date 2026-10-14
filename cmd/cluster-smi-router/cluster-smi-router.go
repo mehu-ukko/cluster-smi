@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"github.com/go-zeromq/zmq4"
 	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/mehu-ukko/cluster-smi/internal/config"
@@ -15,10 +17,21 @@ import (
 	"time"
 )
 
+// set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 // intermediate struct (under mutex lock)
 var allNodes map[string]cluster.Node
 
 func main() {
+
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	// load ports and ip-address
 	cfg := config.Load()

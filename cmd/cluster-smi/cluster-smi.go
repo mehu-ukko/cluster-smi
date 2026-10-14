@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 // dummy request for REQ-ROUTER pattern
 type Request struct {
 	Identity string
@@ -44,7 +47,13 @@ func main() {
 		"(if not specified, all nodes will be shown)")
 	usernameFilter := flag.String("u", "", "show all information only for specific user")
 	useColor := flag.Bool("color", true, "use colored output")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	// load ports and ip-address
 	cfg := config.Load()
