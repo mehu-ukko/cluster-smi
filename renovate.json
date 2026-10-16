@@ -5,6 +5,10 @@
     "customManagers:githubActionsVersions"
   ],
   "postUpdateOptions": ["gomodTidy"],
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"]
+  },
   "packageRules": [
     {
       "matchManagers": ["gomod"],
