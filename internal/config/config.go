@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v3"
 )
 
 // EnvConfigPath is the environment variable pointing to a YAML config file.
