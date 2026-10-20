@@ -6,3 +6,4 @@ ports:
   nodes: 9080            # port of cluster-smi-server, which nodes send to
   clients: 9081          # port of cluster-smi-server, where clients subscribe to
   metrics: 9082          # optional: port of cluster-smi-server serving Prometheus /metrics (omit to disable)
+  web: 9083              # optional: port of cluster-smi-server serving the web page (omit to disable)

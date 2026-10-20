@@ -93,6 +93,7 @@ Without a config file, these defaults are used:
 | `ports.nodes` | `9080` |
 | `ports.clients` | `9081` |
 | `ports.metrics` | unset (Prometheus exporter disabled) |
+| `ports.web` | unset (web page disabled) |
 
 The config file may set `includepath` to a directory (e.g. `/etc/cluster-smi/cluster-smi.d`). The `.yaml` and `.yml` files in it are read in alphabetical order, and each overrides the values set before it. A relative `includepath` is resolved against the directory of the main config file.
 
@@ -104,6 +105,31 @@ The config file may set `includepath` to a directory (e.g. `/etc/cluster-smi/clu
 3. use `cluster-smi` like `nvidia-smi`
 
 Make sure, the machines can communicate using the specifiec ports (e.g., `ufw allow 9080, 9081`)
+
+### Web page
+
+*cluster-smi-router* can also show the cluster in the browser, like *cluster-smi* does in the terminal. Set a web port in the YAML config to enable it:
+
+```yaml
+ports:
+  web: 9083
+```
+
+Then open `http://<router>:9083/`. The table updates itself every `tick`. Checkboxes and fields match the flags of *cluster-smi*:
+
+| Option | Flag | Shows |
+|---|---|---|
+| Processes | `-p` | the processes on each GPU, with user, command, GPU memory and runtime |
+| Extended | `-e` | the full command line of the processes |
+| Details | `-d` | fan speed, temperature and power usage |
+| Last seen | `-t` | when each node last reported |
+| Nodes | `-n` | only the nodes whose name matches a regular expression |
+| User | `-u` | only the GPUs and processes of one user |
+| Highlight | | the processes of one user, as *cluster-smi* highlights your own |
+
+The options are kept in the URL, so a view can be bookmarked or shared. The page starts in the browser's light or dark mode; the button in the header switches it, and the browser remembers the choice. The page also serves the current state as JSON at `/api/cluster` and streams it at `/api/events` (server-sent events). `ports.web` may be the same port as `ports.metrics`.
+
+The page shows the command lines and users of all processes to anyone who can reach the port, the same information *cluster-smi* clients get from the router.
 
 ### Prometheus
 

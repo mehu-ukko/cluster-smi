@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cluster-smi</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='1' y='3' width='14' height='10' rx='2' fill='%2376b900'/><rect x='4' y='6' width='8' height='4' fill='white'/></svg>">
+<script>
+  // theme before the first paint: the user's choice, else the browser's preference
+  (() => {
+    let theme = null;
+    try { theme = localStorage.getItem("cluster-smi-theme"); } catch (e) { /* storage unavailable */ }
+    if (theme !== "light" && theme !== "dark") {
+      theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1d2129;
+    --muted: #6b7280;
+    --border: #e3e6eb;
+    --accent: #2f6feb;
+    --free: #1a7f37;
+    --warn: #b7791f;
+    --hot: #cf222e;
+    --bar-bg: #e9ecf1;
+    --mine: #fff4cc;
+    --offline: #fbeaea;
+  }
+  :root[data-theme=dark] {
+    color-scheme: dark;
+    --bg: #111317;
+    --panel: #181b20;
+    --text: #e4e7ec;
+    --muted: #8b93a1;
+    --border: #2a2f37;
+    --accent: #6ea8ff;
+    --free: #4ac26b;
+    --warn: #e3b341;
+    --hot: #ff6b6b;
+    --bar-bg: #262b33;
+    --mine: #3a3416;
+    --offline: #3a1f22;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  h1 a { color: inherit; text-decoration: none; }
+  #status { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  #status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  #status.live .dot { background: var(--free); }
+  #status.stale .dot { background: var(--warn); }
+  #status.down .dot { background: var(--hot); }
+  #summary { color: var(--muted); font-size: 13px; margin-left: auto; }
+  #summary b { color: var(--text); font-weight: 600; }
+  #theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #theme:hover { border-color: var(--muted); }
+  #theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #theme svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  /* the button shows the theme it switches to */
+  :root[data-theme=dark] #theme .moon, :root[data-theme=light] #theme .sun { display: none; }
+
+  form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  label code { color: var(--muted); font-size: 12px; }
+  input[type=text] {
+    width: 150px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input.invalid { border-color: var(--hot); outline-color: var(--hot); }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  .sep { width: 1px; height: 20px; background: var(--border); }
+
+  main { padding: 16px; overflow-x: auto; }
+  table {
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 100%;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td { padding: 5px 12px; text-align: left; white-space: nowrap; vertical-align: top; }
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    border-bottom: 1px solid var(--border);
+  }
+  td.num, th.num { text-align: right; }
+  tbody.node { border-top: 1px solid var(--border); }
+  tbody.node:first-of-type { border-top: 0; }
+  td.nodename { font-weight: 600; }
+  tr.offline td { background: var(--offline); }
+  tr.offline td.state { color: var(--hot); font-weight: 600; }
+  td.gpu.free { color: var(--free); }
+  /* the highlighted user's processes, or their GPUs when processes are hidden */
+  table.procs tr.mine td.proc, table:not(.procs) tr.mine td.dev { background: var(--mine); }
+  td.cmd { max-width: 48ch; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  td.muted, .muted { color: var(--muted); }
+
+  .meter { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .bar { width: 64px; height: 6px; border-radius: 3px; background: var(--bar-bg); overflow: hidden; flex: none; }
+  .bar > span { display: block; height: 100%; background: var(--free); }
+  .bar.mid > span { background: var(--warn); }
+  .bar.high > span { background: var(--hot); }
+  .hot { color: var(--hot); }
+  .warm { color: var(--warn); }
+
+  #message { padding: 32px 16px; text-align: center; color: var(--muted); }
+  footer { padding: 0 16px 16px; color: var(--muted); font-size: 12px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="https://github.com/mehu-ukko/cluster-smi">cluster-smi</a></h1>
+  <div id="status" class="down"><span class="dot"></span><span id="status-text">connecting…</span></div>
+  <div id="summary"></div>
+  <button id="theme" type="button" title="Switch between light and dark mode">
+    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    <span></span>
+  </button>
+</header>
+
+<form id="options" autocomplete="off" onsubmit="return false">
+  <label title="Show the processes running on the GPUs"><input type="checkbox" name="p"> Processes <code>-p</code></label>
+  <label title="Show the full command line of the processes"><input type="checkbox" name="e"> Extended <code>-e</code></label>
+  <label title="Show fan speed, temperature and power usage"><input type="checkbox" name="d"> Details <code>-d</code></label>
+  <label title="Show when each node last reported"><input type="checkbox" name="t"> Last seen <code>-t</code></label>
+  <span class="sep"></span>
+  <label title="Show only nodes whose name matches this regular expression">Nodes <code>-n</code> <input type="text" name="n" placeholder="regex"></label>
+  <label title="Show only the GPUs and processes of this user">User <code>-u</code> <input type="text" name="u" placeholder="username"></label>
+  <label title="Highlight the processes of this user">Highlight <input type="text" name="h" placeholder="username"></label>
+</form>
+
+<main>
+  <div id="message">Waiting for data…</div>
+  <table id="table" hidden></table>
+</main>
+<footer>Updates are pushed every tick. The options are kept in the URL, so the view can be bookmarked.</footer>
+
+<script>
+"use strict";
+
+const form = document.getElementById("options");
+const table = document.getElementById("table");
+const message = document.getElementById("message");
+const statusBox = document.getElementById("status");
+const statusText = document.getElementById("status-text");
+const summary = document.getElementById("summary");
+
+const MiB = 1024 * 1024;
+let state = null;      // latest message: {timeout, nodes}
+let received = null;   // Date the latest message arrived
+
+// ---------------------------------------------------------------------------
+// options, kept in the URL query (?p=1&d=1&n=gpu-0&u=alice)
+
+function readOptions() {
+  const o = {};
+  for (const el of form.elements) {
+    if (el.type === "checkbox") o[el.name] = el.checked;
+    else if (el.type === "text") o[el.name] = el.value.trim();
+  }
+  return o;
+}
+
+function loadOptions() {
+  const params = new URLSearchParams(location.search);
+  for (const el of form.elements) {
+    if (!params.has(el.name)) continue;
+    if (el.type === "checkbox") el.checked = params.get(el.name) !== "0";
+    else if (el.type === "text") el.value = params.get(el.name);
+  }
+}
+
+function saveOptions(o) {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(o)) {
+    if (v === true) params.set(k, "1");
+    else if (typeof v === "string" && v !== "") params.set(k, v);
+  }
+  const query = params.toString();
+  history.replaceState(null, "", query ? "?" + query : location.pathname);
+}
+
+// ---------------------------------------------------------------------------
+// formatting
+
+function humanizeSeconds(secs) {
+  secs = Math.max(0, Math.floor(secs));
+  const d = Math.floor(secs / 86400), h = Math.floor(secs / 3600) % 24;
+  const m = Math.floor(secs / 60) % 60, s = secs % 60;
+  if (d > 0) return `${d} d ${h} h ${m} min`;
+  if (h > 0) return `${h} h ${m} min`;
+  if (m > 0) return `${m} min ${s} sec`;
+  return `${s} sec`;
+}
+
+function formatTime(date) {
+  return date.toLocaleString(undefined, {
+    weekday: "short", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+
+function mib(bytes) {
+  return Math.round(bytes / MiB).toLocaleString() + " MiB";
+}
+
+// ---------------------------------------------------------------------------
+// DOM helpers; values only ever go through textContent
+
+function el(tag, props, ...children) {
+  const e = document.createElement(tag);
+  if (props) {
+    for (const [k, v] of Object.entries(props)) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") e.className = v;
+      else if (k === "text") e.textContent = v;
+      else e.setAttribute(k, v);
+    }
+  }
+  for (const c of children) if (c) e.append(c);
+  return e;
+}
+
+function meter(percent, text) {
+  const p = Math.max(0, Math.min(100, percent));
+  const level = p >= 90 ? "high" : p >= 60 ? "mid" : "";
+  const fill = el("span");
+  fill.style.width = p + "%";
+  return el("div", { class: "meter" }, el("span", { text }), el("div", { class: "bar " + level }, fill));
+}
+
+// ---------------------------------------------------------------------------
+// view
+
+function columns(o) {
+  const cols = [
+    ["Node"], ["GPU"], ["Memory-Usage", "num"], ["GPU-Util", "num"],
+  ];
+  if (o.d) cols.push(["Fan", "num"], ["Temp", "num"], ["Power", "num"]);
+  if (o.p) cols.push(["PID", "num"], ["User"], ["Command"], ["GPU Mem", "num"], ["Runtime", "num"]);
+  if (o.t) cols.push(["Last Seen"]);
+  return cols;
+}
+
+// prepare returns the nodes to show: sorted, filtered by -n and -u, and
+// marked as online or offline.
+function prepare(o) {
+  const now = Date.now();
+  let regex = null;
+  const nodeInput = form.elements.n;
+  nodeInput.classList.remove("invalid");
+  if (o.n) {
+    try { regex = new RegExp(o.n); } catch (e) { nodeInput.classList.add("invalid"); }
+  }
+
+  const nodes = [];
+  for (const n of state.nodes || []) {
+    if (regex && !regex.test(n.name)) continue;
+    const seen = new Date(n.time);
+    const online = (now - seen.getTime()) / 1000 <= state.timeout;
+    let devices = [...(n.devices || [])].sort((a, b) => a.id - b.id);
+
+    if (o.u) {
+      if (!online) continue;
+      devices = devices
+        .map(d => ({ ...d, Processes: (d.Processes || []).filter(p => p.Username === o.u) }))
+        .filter(d => d.Processes.length > 0);
+      if (devices.length === 0) continue;
+    }
+    nodes.push({ name: n.name, seen, online, devices });
+  }
+  nodes.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return nodes;
+}
+
+function render() {
+  if (!state) return;
+  const o = readOptions();
+  saveOptions(o);
+
+  const cols = columns(o);
+  const nodes = prepare(o);
+
+  // summary over all online nodes, independent of the filters
+  let online = 0, gpus = 0, free = 0;
+  for (const n of state.nodes || []) {
+    if ((Date.now() - new Date(n.time).getTime()) / 1000 > state.timeout) continue;
+    online++;
+    for (const d of n.devices || []) {
+      gpus++;
+      if (!d.Processes || d.Processes.length === 0) free++;
+    }
+  }
+  const total = (state.nodes || []).length;
+  summary.replaceChildren(
+    el("b", { text: `${online}/${total}` }), " nodes online · ",
+    el("b", { text: `${free}/${gpus}` }), " GPUs free");
+
+  const thead = el("thead", null, el("tr", null, ...cols.map(([name, cls]) => el("th", { class: cls, text: name }))));
+  const bodies = nodes.map(n => renderNode(n, o, cols.length));
+
+  if (nodes.length === 0) {
+    table.hidden = true;
+    message.hidden = false;
+    message.textContent = (state.nodes || []).length === 0
+      ? "No node has reported yet."
+      : "No nodes match the filters.";
+    return;
+  }
+  message.hidden = true;
+  table.hidden = false;
+  table.classList.toggle("procs", o.p);
+  table.replaceChildren(thead, ...bodies);
+}
+
+function renderNode(n, o, ncols) {
+  const tbody = el("tbody", { class: "node" });
+  const lastSeen = formatTime(n.seen);
+
+  if (!n.online) {
+    const tr = el("tr", { class: "offline" },
+      el("td", { class: "nodename", text: n.name }),
+      el("td", { class: "state", text: "Offline" }),
+      el("td", { colspan: ncols - 2 - (o.t ? 1 : 0), class: "muted",
+                 text: `no report for ${humanizeSeconds((Date.now() - n.seen.getTime()) / 1000)}` }));
+    if (o.t) tr.append(el("td", { text: lastSeen }));
+    tbody.append(tr);
+    return tbody;
+  }
+
+  // the node cell spans all rows of the node, like the separators of cluster-smi
+  const rowsOf = d => (o.p && d.Processes && d.Processes.length > 0) ? d.Processes.length : 1;
+  const nodeRows = n.devices.reduce((sum, d) => sum + rowsOf(d), 0) || 1;
+  let first = true;
+
+  const nodeCells = tr => {
+    if (!first) return;
+    tr.append(el("td", { class: "nodename", rowspan: nodeRows, text: n.name }));
+  };
+  const timeCells = tr => {
+    if (!first || !o.t) return;
+    tr.append(el("td", { rowspan: nodeRows, text: lastSeen }));
+  };
+
+  if (n.devices.length === 0) {
+    const tr = el("tr");
+    nodeCells(tr);
+    tr.append(el("td", { colspan: ncols - 1 - (o.t ? 1 : 0), class: "muted", text: "no GPUs" }));
+    timeCells(tr);
+    tbody.append(tr);
+    return tbody;
+  }
+
+  for (const d of n.devices) {
+    const procs = d.Processes || [];
+    const span = rowsOf(d);
+    const mem = d.memory || { used: 0, total: 0 };
+    const memPercent = mem.total > 0 ? Math.floor(mem.used * 100 / mem.total) : 0;
+    const mine = o.h && procs.some(p => p.Username === o.h);
+
+    const deviceCells = [
+      el("td", { class: "dev gpu" + (procs.length === 0 ? " free" : ""), rowspan: span, text: `${d.id}: ${d.name}` }),
+      el("td", { class: "dev num", rowspan: span }, meter(memPercent, `${mib(mem.used)} / ${mib(mem.total)} (${memPercent} %)`)),
+      el("td", { class: "dev num", rowspan: span }, meter(d.utilization, `${d.utilization} %`)),
+    ];
+    if (o.d) {
+      const temp = d.temperature >= 85 ? "hot" : d.temperature >= 75 ? "warm" : "";
+      deviceCells.push(
+        el("td", { class: "dev num", rowspan: span, text: `${d.fan_speed} %` }),
+        el("td", { class: "dev num " + temp, rowspan: span, text: `${d.temperature} °C` }),
+        el("td", { class: "dev num", rowspan: span, text: `${d.power_usage} W` }));
+    }
+
+    const rows = (o.p && procs.length > 0) ? procs : [null];
+    rows.forEach((p, i) => {
+      const tr = el("tr", { class: o.h && (p ? p.Username === o.h : mine) ? "mine" : null });
+      nodeCells(tr);
+      if (i === 0) tr.append(...deviceCells);
+      if (o.p) {
+        if (p) {
+          const cmd = o.e ? p.ExtendedCommand || p.Name : p.Name;
+          tr.append(
+            el("td", { class: "proc num", text: p.Pid }),
+            el("td", { class: "proc", text: p.Username }),
+            el("td", { class: "proc cmd", title: p.ExtendedCommand || p.Name, text: cmd }),
+            el("td", { class: "proc num", text: mib(p.UsedGpuMemory) }),
+            el("td", { class: "proc num", text: humanizeSeconds(p.RunTime) }));
+        } else {
+          tr.append(el("td", { colspan: 5 }));
+        }
+      }
+      timeCells(tr);
+      first = false;
+      tbody.append(tr);
+    });
+  }
+  return tbody;
+}
+
+// ---------------------------------------------------------------------------
+// connection status
+
+function setStatus(cls, text) {
+  statusBox.className = cls;
+  statusText.textContent = text;
+}
+
+function updateStatus() {
+  if (!received) return;
+  const age = (Date.now() - received.getTime()) / 1000;
+  if (source.readyState !== EventSource.OPEN) {
+    setStatus("down", `reconnecting… last update ${humanizeSeconds(age)} ago`);
+  } else if (age > 30) {
+    setStatus("stale", `no update for ${humanizeSeconds(age)}`);
+  } else {
+    setStatus("live", `live · updated ${received.toLocaleTimeString()}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// theme: starts from the browser's preference, the toggle overrides it
+
+const themeButton = document.getElementById("theme");
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+function storedTheme() {
+  try { return localStorage.getItem("cluster-smi-theme"); } catch (e) { return null; }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  themeButton.setAttribute("aria-pressed", dark);
+  themeButton.querySelector("span").textContent = dark ? "Light mode" : "Dark mode";
+}
+
+themeButton.addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  try { localStorage.setItem("cluster-smi-theme", theme); } catch (e) { /* not kept across reloads */ }
+  applyTheme(theme);
+});
+
+// follow the browser's preference until the user picks a theme
+darkQuery.addEventListener("change", e => {
+  const stored = storedTheme();
+  if (stored !== "light" && stored !== "dark") applyTheme(e.matches ? "dark" : "light");
+});
+
+applyTheme(document.documentElement.dataset.theme);
+
+// ---------------------------------------------------------------------------
+
+loadOptions();
+form.addEventListener("input", render);
+
+const source = new EventSource("api/events");
+source.onmessage = e => {
+  state = JSON.parse(e.data);
+  received = new Date();
+  render();
+  updateStatus();
+};
+source.onopen = () => { if (!received) setStatus("live", "connected, waiting for data…"); };
+source.onerror = () => {
+  if (received) updateStatus();
+  else setStatus("down", "cannot reach the server, retrying…");
+};
+
+// refresh the offline states and the status age between updates
+setInterval(() => { updateStatus(); if (state) render(); }, 5000);
+</script>
+</body>
+</html>

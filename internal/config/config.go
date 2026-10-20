@@ -52,6 +52,10 @@ const (
 	// DefaultPortMetrics is the router port serving Prometheus metrics.
 	// Empty disables the exporter.
 	DefaultPortMetrics = ""
+
+	// DefaultPortWeb is the router port serving the web page.
+	// Empty disables the web page.
+	DefaultPortWeb = ""
 )
 
 // Config holds the runtime configuration for the cluster-smi binaries.
@@ -64,6 +68,7 @@ type Config struct {
 		Nodes   string `yaml:"nodes"`   // port of cluster-smi-router, which nodes send to
 		Clients string `yaml:"clients"` // port of cluster-smi-router, where clients subscribe to
 		Metrics string `yaml:"metrics"` // port of cluster-smi-router serving Prometheus metrics (empty disables)
+		Web     string `yaml:"web"`     // port of cluster-smi-router serving the web page (empty disables)
 	} `yaml:"ports"`
 
 	source   string   // file the configuration was read from, empty when defaults are used
@@ -170,6 +175,7 @@ func defaults() Config {
 	c.Ports.Nodes = DefaultPortNodes
 	c.Ports.Clients = DefaultPortClients
 	c.Ports.Metrics = DefaultPortMetrics
+	c.Ports.Web = DefaultPortWeb
 
 	return c
 }
@@ -195,4 +201,5 @@ func (c Config) Print() {
 	log.Println("    Nodes:", c.Ports.Nodes)
 	log.Println("    Clients:", c.Ports.Clients)
 	log.Println("    Metrics:", c.Ports.Metrics)
+	log.Println("    Web:", c.Ports.Web)
 }

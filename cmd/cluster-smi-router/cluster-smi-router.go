@@ -8,6 +8,7 @@ import (
 	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/mehu-ukko/cluster-smi/internal/config"
 	"github.com/mehu-ukko/cluster-smi/internal/exporter"
+	"github.com/mehu-ukko/cluster-smi/internal/web"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/vmihailenco/msgpack/v5"
@@ -51,19 +52,46 @@ func main() {
 		return nodes
 	}
 
+	// HTTP handlers by port, so metrics and web page may share one port
+	muxes := make(map[string]*http.ServeMux)
+	muxFor := func(port string) *http.ServeMux {
+		if muxes[port] == nil {
+			muxes[port] = http.NewServeMux()
+		}
+		return muxes[port]
+	}
+
 	// serving Prometheus metrics (optional)
 	if cfg.Ports.Metrics != "" {
 		registry := prometheus.NewRegistry()
 		registry.MustRegister(exporter.New(snapshot, time.Duration(cfg.Timeout)*time.Second))
 
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+		muxFor(cfg.Ports.Metrics).Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+		log.Println("Serving Prometheus metrics at", ":"+cfg.Ports.Metrics+"/metrics")
+	}
 
+	// serving the web page (optional)
+	if cfg.Ports.Web != "" {
+		page := web.New(cfg.Timeout)
+		muxFor(cfg.Ports.Web).Handle("/", page.Handler())
+		log.Println("Serving the web page at", ":"+cfg.Ports.Web+"/")
+
+		// pass the current state to the page every tick, like clients request it
 		go func() {
-			MetricsAddr := ":" + cfg.Ports.Metrics
-			log.Println("Serving Prometheus metrics at", MetricsAddr+"/metrics")
-			if err := http.ListenAndServe(MetricsAddr, mux); err != nil {
-				log.Fatalf("Failed to serve metrics at %s: %s\n", MetricsAddr, err.Error())
+			for {
+				if err := page.Update(cluster.Cluster{Nodes: snapshot()}); err != nil {
+					log.Println("web encode error:", err)
+				}
+				time.Sleep(time.Duration(cfg.Tick) * time.Second)
+			}
+		}()
+	}
+
+	for port, mux := range muxes {
+		server := &http.Server{Addr: ":" + port, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			if err := server.ListenAndServe(); err != nil {
+				log.Fatalf("Failed to serve HTTP at %s: %s\n", server.Addr, err.Error())
 			}
 		}()
 	}
