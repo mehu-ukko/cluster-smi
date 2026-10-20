@@ -140,6 +140,25 @@ scrape_configs:
 
 GPU metrics of offline nodes are not exported, so their series go stale; `cluster_smi_node_up` stays at 0 for them.
 
+#### Grafana dashboards
+
+The [`grafana`](./grafana) directory contains two dashboards in the Grafana v2 dashboard schema (Grafana 12 or newer, with v2 dashboards enabled):
+
+* `cluster-smi-summary.json`: all nodes at a glance. Shows available and busy GPUs, offline nodes, the average utilization per server, a table of users with the utilization of the GPUs they run on, and temperatures and power.
+* `cluster-smi-detail.json`: one or more servers in detail. Shows availability, a per-GPU state table, a per-GPU users table, and utilization, memory, temperature, power and fan speed per GPU.
+
+Import them through *Dashboards → New → Import*, or with the API:
+
+```console
+curl -u admin -H 'Content-Type: application/json' \
+  http://grafana:3000/apis/dashboard.grafana.app/v2/namespaces/default/dashboards \
+  -d @grafana/cluster-smi-summary.json
+```
+
+Pick the Prometheus data source with the *Data source* variable. *Smoothing* sets the moving average window of the time series.
+
+Utilization is measured per GPU, not per process. A user's GPU and memory utilization is therefore the utilization of the GPUs that user has processes on, and it is shared with any other users on the same GPU.
+
 ### Use systemd
 
 To ease the use of this app, I suggest to add the *cluster-smi-node* into a systemd-service. An example config file can be found <a href="./service/cluster-smi-node.service">here</a>. The steps would be
