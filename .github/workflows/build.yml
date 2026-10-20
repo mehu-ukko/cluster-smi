@@ -85,3 +85,18 @@ jobs:
         with:
           files: |
             cluster-smi-*-linux-amd64.tar.gz
+
+  notify-anitya:
+    name: notify release-monitoring.org
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Trigger Anitya version check
+        env:
+          ANITYA_TOKEN: ${{ secrets.ANITYA_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST https://release-monitoring.org/api/v2/versions/ \
+            -H "Authorization: token ${ANITYA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"id": 392713, "dry_run": false}'
