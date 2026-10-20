@@ -4,38 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/go-zeromq/zmq4"
 	"github.com/mehu-ukko/cluster-smi/cluster"
 	"github.com/mehu-ukko/cluster-smi/internal/config"
-	"github.com/vmihailenco/msgpack/v5"
-	"log"
-	"os"
+	"github.com/mehu-ukko/cluster-smi/internal/routerclient"
 	"time"
 )
 
 // set at build time via -ldflags "-X main.version=..."
 var version = "dev"
-
-// dummy request for REQ-ROUTER pattern
-type Request struct {
-	Identity string
-}
-
-func RequestUpdateMessage() ([]byte, error) {
-	id := fmt.Sprintf("REQ %v", os.Getpid())
-	req := Request{id}
-	return msgpack.Marshal(&req)
-}
-
-// dialReq returns a REQ socket connected to addr.
-func dialReq(addr string) (zmq4.Socket, error) {
-	socket := zmq4.NewReq(context.Background())
-	if err := socket.Dial(addr); err != nil {
-		socket.Close()
-		return nil, err
-	}
-	return socket, nil
-}
 
 func main() {
 
@@ -62,64 +38,7 @@ func main() {
 	tick := time.Duration(cfg.Tick) * time.Second
 
 	// ask for updates messages (REQ-ROUTER)
-	// the router might not be up yet: keep retrying instead of giving up
-	var request_socket zmq4.Socket
-	for request_socket == nil {
-		s, err := dialReq(SocketAddr)
-		if err != nil {
-			log.Printf("Failed to dial %s: %s (retrying in %v)\n", SocketAddr, err.Error(), tick)
-			time.Sleep(tick)
-			continue
-		}
-		request_socket = s
-	}
-	defer func() { request_socket.Close() }()
-
-	for {
-
-		// a REQ socket cannot resume a broken request-reply cycle: whenever one
-		// fails the socket is dropped and a fresh one is dialed here
-		if request_socket == nil {
-			s, err := dialReq(SocketAddr)
-			if err != nil {
-				log.Println("redial error:", err)
-				time.Sleep(tick)
-				continue
-			}
-			log.Println("Reconnected to", SocketAddr)
-			request_socket = s
-		}
-
-		// request new update
-		buf, err := RequestUpdateMessage()
-		if err != nil {
-			log.Fatal("request messsage error:", err)
-		}
-		if err = request_socket.Send(zmq4.NewMsg(buf)); err != nil {
-			log.Println("sending request messsage error:", err)
-			request_socket.Close()
-			request_socket = nil
-			time.Sleep(tick)
-			continue
-		}
-
-		// response from cluster-smi-server
-		msg, err := request_socket.Recv()
-		if err != nil {
-			log.Println(err)
-			request_socket.Close()
-			request_socket = nil
-			time.Sleep(tick)
-			continue
-		}
-
-		var clus cluster.Cluster
-		err = msgpack.Unmarshal(msg.Bytes(), &clus)
-		if err != nil {
-			log.Println("decode error:", err)
-			continue
-		}
-
+	routerclient.Poll(context.Background(), SocketAddr, tick, func(clus cluster.Cluster) {
 		if *usernameFilter != "" {
 			clus = cluster.FilterByUser(clus, *usernameFilter)
 		}
@@ -127,7 +46,6 @@ func main() {
 		clus.Sort()
 		clus.FilterNodes(*nodeRegex)
 		clus.Print(*showProcessesPtr, *showTimePtr, cfg.Timeout, *useColor, *showExtendedPtr, *showDetailPtr)
-		time.Sleep(tick)
-	}
+	})
 
 }
