@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/procfs v0.23.0
 	github.com/tklauser/go-sysconf v0.4.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 )
 
 require (
