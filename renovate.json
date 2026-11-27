@@ -16,6 +16,10 @@
       "matchDepNames": ["go"],
       "matchDepTypes": ["golang"],
       "rangeStrategy": "bump"
+    },
+    {
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true
     }
   ]
 }
