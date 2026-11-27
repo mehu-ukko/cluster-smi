@@ -5,6 +5,7 @@
     "customManagers:githubActionsVersions"
   ],
   "postUpdateOptions": ["gomodTidy"],
+  "rebaseWhen": "behind-base-branch",
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "labels": ["security"]
